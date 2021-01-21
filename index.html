@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>WebGL Play</title>
+		<meta charset="utf-8">
+		<style>
+canvas {
+	border: 2px solid black;
+	background-color: black;
+}
+		</style>
+		<script src="lib/gl-matrix-min.js" ></script>
+		<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
+            integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ=="
+            crossorigin="anonymous"></script>-->
+            <script>
+            	if(typeof mat4 === 'undefined'){
+            		mat4 = glMatrix.mat4;
+            	}
+            </script>
+	</head>
+	<body>
+		<div id="msgBlk">
+		<!-- -->
+		<h1>WebGL Test 1</h1>
+		<canvas id="canvas-1" width="600" height="400">Canvas not supported!</canvas>
+		<script defer>
+function test1(){
+	// first, get canvas element by ID
+	const canvas = document.querySelector('#canvas-1');
+	// Initialize the GL context
+	const gl = canvas.getContext('webgl');
+	// check if WebGL is not supported
+	if (!gl) { 
+		// no WebGL :(
+		alert('Unable to initialize WebGL. Your browser or machine may not support it.');
+		return;
+	}
+
+	// Set clear color to dark blue, fully opaque
+	gl.clearColor(0.0, 0.0, 0.30, 1.0);
+	
+	// Clear the color buffer with specified clear color
+	gl.clear(gl.COLOR_BUFFER_BIT);
+}
+test1();
+		</script>
+		<!-- -->
+		
+		<h1>WebGL Test 2</h1>
+		<div>FPS: <span id="fps-2">?</span></div>
+		<canvas id="canvas-2" width="600" height="400">Canvas not supported!</canvas>
+		<script>
+function initWebGL(canvasID){
+	// first, get canvas element by ID
+	const canvas = document.querySelector('#'+canvasID);
+	// Initialize the GL context
+	const gl = canvas.getContext('webgl');
+	// check if WebGL is not supported
+	if (!gl) { 
+		// no WebGL :(
+		return null;
+	}
+	return gl;
+}
+
+// compile shader program
+function loadShader(gl, type, source) {
+	const shader = gl.createShader(type);
+	// Send the source to the shader object
+	gl.shaderSource(shader, source);
+	// Compile the shader program
+	gl.compileShader(shader);
+	// See if it compiled successfully
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+		alert('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+		gl.deleteShader(shader);
+		return null;
+	}
+	return shader;
+}
+
+// Initialize a shader program, so WebGL knows how to draw our data
+function initShaderProgram(gl, vsSource, fsSource) {
+	const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+	const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+	// Create the shader program
+	const shaderProgram = gl.createProgram();
+	gl.attachShader(shaderProgram, vertexShader);
+	gl.attachShader(shaderProgram, fragmentShader);
+	gl.linkProgram(shaderProgram);
+
+	// If creating the shader program failed, alert
+
+	if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+		alert('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+		return null;
+	}
+	return shaderProgram;
+}
+var test2 = {
+	framecounter: 0,	
+
+	// initialize vertex buffers
+	initBuffers: function(gl){
+		// make a graphics buffer (handle)
+		const vertexBuffer = gl.createBuffer();
+		// then load the data into the graphics buffer
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+		gl.bufferData(
+			gl.ARRAY_BUFFER, 
+			new Float32Array([
+				-1.0,	1.0,
+				1.0,	1.0,
+				-1.0,	-1.0,
+				1.0,	-1.0
+			]), 
+			gl.STATIC_DRAW
+		);
+		return {myquad: vertexBuffer}
+	},
+
+	// draw cycle
+	drawScene: function(gl, shaderProgramData, buffers, time_ms){
+		const pi = Math.PI;
+		//
+		gl.clearColor(0.0, 0.0, 0.30, 1.0); // Paint background color dark blue, fully opaque
+		gl.clearDepth(1.0); // clear the scene
+		gl.enable(gl.DEPTH_TEST); // enable depth
+		gl.depthFunc(gl.LEQUAL); // hide far stuff behind close stuff
+		
+		// clear the canvas
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		
+		// set perspective
+		const fieldOfView = 45 * pi / 180;   //// in radians
+		const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+		const zNear = 0.1; // depth clipping
+		const zFar = 100.0;// depth clipping
+		const projectionMatrix = mat4.create();
+		mat4.perspective(
+			projectionMatrix, // first arg is destination
+			fieldOfView,
+			aspect,
+			zNear,
+			zFar
+		);
+		
+		// now position the 3D model
+		const modelViewMatrix = mat4.create();
+		mat4.translate(modelViewMatrix, // move model away from viewer
+			modelViewMatrix, [0.0, 0.0, -4]);
+		const period_ms = 4000;
+		const rotation = (time_ms % period_ms) / period_ms * pi;
+		mat4.rotate(
+			modelViewMatrix, modelViewMatrix,
+			rotation,
+			[0, 0, 1] // Z-axis rotation
+		);
+		// set model buffer and shader data
+		const vectorSize = 2; // 2D vertices
+		const type = gl.FLOAT; // 32bit floats in buffer
+		const normalize = false; // disable normalizing
+		const stride = 0; // disable stride
+		const offset = 0; // start of data in buffer
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffers.myquad);
+		gl.vertexAttribPointer(
+			shaderProgramData.attribLocations.vertexPosition,
+			vectorSize,
+			type,
+			normalize,
+			stride,
+			offset
+		);
+		gl.enableVertexAttribArray(shaderProgramData.attribLocations.vertexPosition);
+		gl.useProgram(shaderProgramData.shader);
+		// set shader uniforms (eg lighting)
+		gl.uniformMatrix4fv(
+			shaderProgramData.uniformLocations.projectionMatrix,
+			false,
+			projectionMatrix
+		);
+		gl.uniformMatrix4fv(
+			shaderProgramData.uniformLocations.modelViewMatrix,
+			false,
+			modelViewMatrix
+		);
+		// FINALLY, draw triangles from the vertex buffer
+		const vertexCount = 4;
+		gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
+	},
+
+	// test 2 main
+	main: function(){
+		const gl = initWebGL("canvas-2");
+		if(gl === null) return; // WebGL not supported :(
+		
+		// shaders
+		const vectorShaderSrc = `
+			attribute vec4 aVertexPosition;
+
+			uniform mat4 uModelViewMatrix;
+			uniform mat4 uProjectionMatrix;
+
+			void main() {
+				gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+			}
+		`;
+		const fragmentShaderSrc = `
+			void main() {
+				gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+			}
+		`;
+		
+		// shake-and-bake the shader code
+		const shaderProgram = initShaderProgram(gl, vectorShaderSrc, fragmentShaderSrc);
+		
+		// graphics program parameters (aka uniforms)
+		const shaderProgramData = {
+			shader: shaderProgram,
+			// uniforms and attributes defined in vector shader program
+			attribLocations: {
+				vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+			},
+			uniformLocations: {
+				projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+				modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+			},
+		};
+		
+		// create 3D model data and store it in the graphics buffer
+		const buffers = this.initBuffers(gl);
+		
+		// draw the graphics buffers to the scene with animation
+		const renderLoop = function(time_ms){ // closure callback looping
+			test2.drawScene(gl, shaderProgramData, buffers, time_ms);
+			test2.framecounter = test2.framecounter + 1;
+			requestAnimationFrame(renderLoop);
+		}
+		requestAnimationFrame(renderLoop);
+		
+		// finally, show FPS in HTML (because text rendering in GL is ****!)
+		const fpsUpdateInterval = 250;
+		window.setInterval(function(){
+			document.querySelector('#fps-2').textContent = 1000*(test2.framecounter / fpsUpdateInterval);
+			test2.framecounter = 0;
+		}, fpsUpdateInterval);
+		
+	}
+}
+test2.main();
+		</script>
+		
+		<!-- -->
+		
+		<h1>WebGL Test 3</h1>
+		<div>FPS: <span id="fps-3">?</span></div>
+		<canvas id="canvas-3" width="600" height="400">Canvas not supported!</canvas>
+		<script>
+
+var test3 = {
+	framecounter: 0,	
+
+	// initialize vertex buffers
+	initBuffers: function(gl){
+		// make a graphics buffer (handle)
+		const vertexBuffer = gl.createBuffer();
+		// then load the data into the graphics buffer
+/* NOTE:
+gl.bindBuffer and gl.bufferData - enums
+
+    gl.ARRAY_BUFFER which represents vertex data.
+
+    gl.ELEMENT_ARRAY_BUFFER which represents index data.
+
+
+
+    gl.STATIC_DRAW − Data will be specified once and used many times.
+
+    gl.STREAM_DRAW − Data will be specified once and used a few times.
+
+    gl.DYNAMIC_DRAW − Data will be specified repeatedly and used many times.
+
+*/
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+		gl.bufferData(
+			gl.ARRAY_BUFFER, 
+			new Float32Array([
+/*  2-----3
+   /|    /|
+  / |   / |
+ 6-----7  |
+ |  0--|--1
+ | /   | / 
+ |/    |/  
+ 4-----5   */
+				-1.0,	-1.0,	-1.0,	// index #0
+				1.0,	-1.0,	-1.0,	// index #1
+				-1.0,	1.0,	-1.0,	// index #2
+				1.0,	1.0,	-1.0,	// index #3
+				-1.0,	-1.0,	1.0,	// index #4
+				1.0,	-1.0,	1.0,	// index #5
+				-1.0,	1.0,	1.0,	// index #6
+				1.0,	1.0,	1.0,	// index #7
+			]), 
+			gl.STATIC_DRAW
+		);
+		const indexBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+		gl.bufferData(
+			gl.ELEMENT_ARRAY_BUFFER, 
+			new Uint16Array([
+				4,5,7,	7,6,4, // front quad
+				1,0,2,	2,3,1, // back quad
+				0,4,6,	6,2,0, // left quad
+				1,3,7,	7,5,1, // right quad
+				0,1,5,	5,4,0, // bottom quad
+				2,6,7,	7,3,2, // top quad
+			]), 
+			gl.STATIC_DRAW
+		);
+		// load color data
+		const colors = [
+		0.0,  0.0,  0.0,  1.0,    // black
+		0.5,  0.5,  0.0,  1.0,    // brown
+		1.0,  0.0,  0.0,  1.0,    // red
+		1.0,  0.5,  0.0,  1.0,    // orange
+		1.0,  1.0,  0.0,  1.0,    // yellow
+		0.0,  1.0,  0.0,  1.0,    // green
+		0.0,  0.0,  1.0,  1.0,    // blue
+		0.5,  0.0,  1.0,  1.0,    // violet
+		];
+		const colorBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+		// return
+		return {cubeVerts: vertexBuffer, cubeIdxs: indexBuffer, qcolor: colorBuffer}
+	},
+
+	// draw cycle
+	drawScene: function(gl, shaderProgramData, buffers, time_ms){
+		const pi = Math.PI;
+		//
+		gl.clearColor(0.0, 0.0, 0.30, 1.0); // Paint background color dark blue, fully opaque
+		gl.clearDepth(1.0); // clear the scene
+		gl.enable(gl.DEPTH_TEST); // enable depth
+		gl.depthFunc(gl.LEQUAL); // hide far stuff behind close stuff
+		
+		// clear the canvas
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		
+		// set perspective
+		const fieldOfView = 45 * pi / 180;   //// in radians
+		const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+		const zNear = 0.1; // depth clipping
+		const zFar = 100.0;// depth clipping
+		const projectionMatrix = mat4.create();
+		mat4.perspective(
+			projectionMatrix, // first arg is destination
+			fieldOfView,
+			aspect,
+			zNear,
+			zFar
+		);
+		
+		// now position the 3D model
+		const modelViewMatrix = mat4.create();
+		mat4.translate(modelViewMatrix, // move model away from viewer
+			modelViewMatrix, [0.0, 0.0, -4]);
+		const period_ms = 2000;
+		const rotation = (time_ms % (period_ms*3)) / (period_ms*3) * 2 * pi;
+		const rotation2 = (time_ms % (period_ms*5)) / (period_ms*5) * 2 * pi;
+		mat4.rotate(
+			modelViewMatrix, modelViewMatrix,
+			-1*rotation,
+			[0, 0, 1] // Z-axis rotation
+		);
+		mat4.rotate(
+			modelViewMatrix, modelViewMatrix,
+			-1*rotation2,
+			[0, 1, 0] // Y-axis rotation
+		);
+		// set model buffer and shader data
+		{
+			const vectorSize = 3; // 3D vertices
+			const type = gl.FLOAT; // 32bit floats in buffer
+			const normalize = false; // disable normalizing
+			const stride = 0; // disable stride
+			const offset = 0; // start of data in buffer
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.cubeVerts);
+			gl.vertexAttribPointer(
+				shaderProgramData.attribLocations.vertexPosition,
+				vectorSize,
+				type,
+				normalize,
+				stride,
+				offset
+			);
+			gl.enableVertexAttribArray(shaderProgramData.attribLocations.vertexPosition);
+			gl.useProgram(shaderProgramData.shader);
+			// set shader uniforms (eg lighting)
+			gl.uniformMatrix4fv(
+				shaderProgramData.uniformLocations.projectionMatrix,
+				false,
+				projectionMatrix
+			);
+			gl.uniformMatrix4fv(
+				shaderProgramData.uniformLocations.modelViewMatrix,
+				false,
+				modelViewMatrix
+			);
+		}
+		// add color
+		{
+			const numComponents = 4;
+			const type = gl.FLOAT;
+			const normalize = false;
+			const stride = 0;
+			const offset = 0;
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.qcolor);
+			gl.vertexAttribPointer(
+				shaderProgramData.attribLocations.vertexColor,
+				numComponents,
+				type,
+				normalize,
+				stride,
+				offset);
+			gl.enableVertexAttribArray(
+				shaderProgramData.attribLocations.vertexColor);
+		}
+
+		// FINALLY, draw triangles from the vertex buffer with the index buffer
+		{
+			const indexCount = 6*6;
+			const offset = 0;
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.cubeIdxs);
+			gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, offset);
+		}
+	},
+
+	// test 3 main
+	main: function(){
+		const gl = initWebGL("canvas-3");
+		if(gl === null) return; // WebGL not supported :(
+		
+		// shaders
+		const vectorShaderSrc = `
+attribute vec4 aVertexPosition;
+attribute vec4 aVertexColor;
+
+uniform mat4 uModelViewMatrix;
+uniform mat4 uProjectionMatrix;
+
+varying lowp vec4 vColor;
+
+void main(void) {
+	gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+	vColor = aVertexColor;
+}
+		`;
+		const fragmentShaderSrc = `
+varying lowp vec4 vColor;
+
+void main(void) {
+	gl_FragColor = vColor;
+}
+		`;
+		
+		// shake-and-bake the shader code
+		const shaderProgram = initShaderProgram(gl, vectorShaderSrc, fragmentShaderSrc);
+		
+		// graphics program parameters (aka uniforms)
+		const shaderProgramData = {
+			shader: shaderProgram,
+			// uniforms and attributes defined in vector shader program
+			attribLocations: {
+				vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+				vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+			},
+			uniformLocations: {
+				projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+				modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+			},
+		};
+		
+		// create 3D model data and store it in the graphics buffer
+		const buffers = this.initBuffers(gl);
+		
+		// draw the graphics buffers to the scene with animation
+		const renderLoop = function(time_ms){ // closure callback looping
+			test3.drawScene(gl, shaderProgramData, buffers, time_ms);
+			test3.framecounter = test3.framecounter + 1;
+			requestAnimationFrame(renderLoop);
+		}
+		requestAnimationFrame(renderLoop);
+		
+		// finally, show FPS in HTML (because text rendering in GL is ****!)
+		const fpsUpdateInterval = 250;
+		window.setInterval(function(){
+			document.querySelector('#fps-3').textContent = 1000*(test3.framecounter / fpsUpdateInterval);
+			test3.framecounter = 0;
+		}, fpsUpdateInterval);
+		
+	}
+}
+test3.main();
+		</script>
+<!-- -->
+	</body>
+</html>
