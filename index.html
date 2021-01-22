@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- These examples based on https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial -->
 <html>
 	<head>
 		<title>WebGL Play</title>
@@ -817,6 +818,361 @@ void main(void) {
 test4.main();
 		</script>
 		
+		
+
+		
+		<!-- -->
+		
+		<h1>WebGL Test 5</h1>
+		<div>FPS: <span id="fps-5">?</span></div>
+		<canvas id="canvas-5" width="600" height="400">Canvas not supported!</canvas>
+		<script>
+
+var test5 = {
+	framecounter: 0,	
+
+	// initialize vertex buffers
+	initBuffers: function(gl){
+		// load a graphics buffer for vertex data
+		const cubeVertices = [
+			-1.0,	-1.0,	-1.0,	// index #0
+			1.0,	-1.0,	-1.0,	// index #1
+			-1.0,	1.0,	-1.0,	// index #2
+			1.0,	1.0,	-1.0,	// index #3
+			-1.0,	-1.0,	1.0,	// index #4
+			1.0,	-1.0,	1.0,	// index #5
+			-1.0,	1.0,	1.0,	// index #6
+			1.0,	1.0,	1.0,	// index #7
+		]
+		const vertexBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+		gl.bufferData(
+			gl.ARRAY_BUFFER, 
+			new Float32Array(cubeVertices), 
+			gl.STATIC_DRAW
+		);
+
+		const cubeIndices = [
+			4,5,7,	7,6,4, // front quad
+			1,0,2,	2,3,1, // back quad
+			0,4,6,	6,2,0, // left quad
+			1,3,7,	7,5,1, // right quad
+			0,1,5,	5,4,0, // bottom quad
+			2,6,7,	7,3,2, // top quad
+		]
+		const indexBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+		gl.bufferData(
+			gl.ELEMENT_ARRAY_BUFFER, 
+			new Uint16Array(cubeIndices), 
+			gl.STATIC_DRAW
+		);
+/*  2-----3
+   /|    /|
+  / |   / |
+ 6-----7  |
+ |  0--|--1
+ | /   | / 
+ |/    |/  
+ 4-----5   */
+		// surface normals - manually doing this SUCKS! Use a 3D model file format or cross-product!
+		const normalVectors = [
+			// front
+0,0,1, 0,0,1, 0,0,1,  0,0,1, 0,0,1, 0,0,1,
+			// back
+0,0,-1, 0,0,-1, 0,0,-1,  0,0,-1, 0,0,-1, 0,0,-1,
+			// left
+-1,0,0, -1,0,0, -1,0,0,  -1,0,0, -1,0,0, -1,0,0,
+			// right
+1,0,0, 1,0,0, 1,0,0,  1,0,0, 1,0,0, 1,0,0,
+			// bottom
+0,-1,0, 0,-1,0, 0,-1,0,  0,-1,0, 0,-1,0, 0,-1,0,
+			// top
+0,1,0, 0,1,0, 0,1,0,  0,1,0, 0,1,0, 0,1,0,
+		];
+		const normalBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, normalBuffer);
+		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(normalVectors), gl.STATIC_DRAW);
+		// load texture data
+		const textureCoordinates = [ // manually doing this SUCKS! Use a 3D model file format!
+			0,0,	// index #0
+			1,0,	// index #1
+			0,1,	// index #2
+			1,1,	// index #3
+			1,1,	// index #4
+			0,1,	// index #5
+			1,0,	// index #6
+			0,0,	// index #7
+		];
+		const texture = gl.createTexture();
+		{
+			gl.bindTexture(gl.TEXTURE_2D, texture);
+			const level = 0; // Mipmap level
+			const internalFormat = gl.RGBA;
+			const srcFormat = gl.RGBA;
+			const srcType = gl.UNSIGNED_BYTE;
+			const image = new Image(); // HTML Image Element outside the DOM
+			image.onload = function() {
+				gl.bindTexture(gl.TEXTURE_2D, texture);
+				gl.texImage2D(
+					gl.TEXTURE_2D, level, internalFormat,
+					srcFormat, srcType, image 
+// image can be ImageData, HTMLImageElement, HTMLVideoElement, or HTMLCanvasElement 
+// or replace [srcFormat, srcType, image] 
+// with [width, height, border, format, type, ArrayBufferView srcData, srcOffset]
+				);
+
+				// go ahead with mip-mapping the image if possible 
+				if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+					gl.generateMipmap(gl.TEXTURE_2D);
+				} else {
+					// non power-of-2 mips not supported
+					// Note: S = U = X dimension of image, T = V = Y dimension
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+				}
+			};
+			image.src = texture1DataURI;
+		}
+		
+		const textureCoordBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+		// load color data
+		const colors = [
+		0.0,  0.0,  0.0,  1.0,    // black
+		0.5,  0.5,  0.0,  1.0,    // brown
+		1.0,  0.0,  0.0,  1.0,    // red
+		1.0,  0.5,  0.0,  1.0,    // orange
+		1.0,  1.0,  0.0,  1.0,    // yellow
+		0.0,  1.0,  0.0,  1.0,    // green
+		0.0,  0.0,  1.0,  1.0,    // blue
+		0.5,  0.0,  1.0,  1.0,    // violet
+		];
+		const colorBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+		// return
+		return {cubeVerts: vertexBuffer, cubeIdxs: indexBuffer, cubeTex: texture, cubeTexCoords: textureCoordBuffer, cubeNorms: normalBuffer}
+	},
+
+	// draw cycle
+	drawScene: function(gl, shaderProgramData, buffers, time_ms){
+		const pi = Math.PI;
+		//
+		gl.clearColor(0.0, 0.0, 0.30, 1.0); // Paint background color dark blue, fully opaque
+		gl.clearDepth(1.0); // clear the scene
+		gl.enable(gl.DEPTH_TEST); // enable depth
+		gl.depthFunc(gl.LEQUAL); // hide far stuff behind close stuff
+		
+		// clear the canvas
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		
+		// set perspective
+		const fieldOfView = 45 * pi / 180;   //// in radians
+		const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+		const zNear = 0.1; // depth clipping
+		const zFar = 100.0;// depth clipping
+		const projectionMatrix = mat4.create();
+		mat4.perspective(
+			projectionMatrix, // first arg is destination
+			fieldOfView,
+			aspect,
+			zNear,
+			zFar
+		);
+		
+		// now position the 3D model
+		const modelViewMatrix = mat4.create();
+		mat4.translate(modelViewMatrix, // move model away from viewer
+			modelViewMatrix, [0.0, 0.0, -4]);
+		const period_ms = 2000;
+		const rotation = (time_ms % (period_ms*3)) / (period_ms*3) * 2 * pi;
+		const rotation2 = (time_ms % (period_ms*5)) / (period_ms*5) * 2 * pi;
+		mat4.rotate(
+			modelViewMatrix, modelViewMatrix,
+			-1*rotation,
+			[0, 0, 1] // Z-axis rotation
+		);
+		mat4.rotate(
+			modelViewMatrix, modelViewMatrix,
+			-1*rotation2,
+			[0, 1, 0] // Y-axis rotation
+		);
+		// set model buffer and shader data
+		{
+			const vectorSize = 3; // 3D vertices
+			const type = gl.FLOAT; // 32bit floats in buffer
+			const normalize = false; // disable normalizing
+			const stride = 0; // disable stride
+			const offset = 0; // start of data in buffer
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.cubeVerts);
+			gl.vertexAttribPointer(
+				shaderProgramData.attribLocations.vertexPosition,
+				vectorSize,
+				type,
+				normalize,
+				stride,
+				offset
+			);
+			gl.enableVertexAttribArray(shaderProgramData.attribLocations.vertexPosition);
+			gl.useProgram(shaderProgramData.shader);
+			// set shader uniforms (eg lighting)
+			gl.uniformMatrix4fv(
+				shaderProgramData.uniformLocations.projectionMatrix,
+				false,
+				projectionMatrix
+			);
+			gl.uniformMatrix4fv(
+				shaderProgramData.uniformLocations.modelViewMatrix,
+				false,
+				modelViewMatrix
+			);
+		}
+		
+		// apply lighting transform
+		const normalMatrix = mat4.create();
+		mat4.invert(normalMatrix, modelViewMatrix); // move normals according to rotation and such
+		mat4.transpose(normalMatrix, normalMatrix);
+		gl.uniformMatrix4fv(
+			shaderProgramData.uniformLocations.normalMatrix,
+			false,
+			normalMatrix
+		);
+		 {
+			const numComponents = 3;
+			const type = gl.FLOAT;
+			const normalize = false;
+			const stride = 0;
+			const offset = 0;
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.cubeNorms);
+			gl.vertexAttribPointer(
+				shaderProgramData.attribLocations.vertexNormal,
+				numComponents,
+				type,
+				normalize,
+				stride,
+				offset
+			);
+			gl.enableVertexAttribArray(shaderProgramData.attribLocations.vertexNormal);
+		}
+		
+		// texture
+		{
+			const vecSize = 2; // texture coordinates are 2D
+			const type = gl.FLOAT; // 32 bit float
+			const normalize = false;
+			const stride = 0; 
+			const offset = 0;
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.cubeTexCoords);
+			gl.vertexAttribPointer(shaderProgramData.attribLocations.textureCoord, vecSize, type, normalize, stride, offset);
+			gl.enableVertexAttribArray(shaderProgramData.attribLocations.textureCoord);
+		}
+
+		// FINALLY, draw triangles from the vertex buffer with the index buffer
+		{
+			const indexCount = 6*6;
+			const offset = 0;
+			gl.activeTexture(gl.TEXTURE0);
+
+			// Bind the texture to texture unit 0
+			gl.bindTexture(gl.TEXTURE_2D, buffers.cubeTex);
+
+			// Tell the shader we bound the texture to texture unit 0
+			gl.uniform1i(shaderProgramData.uniformLocations.texSampler, 0);
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.cubeIdxs);
+			gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, offset);
+		}
+	},
+
+	// test 5 main
+	main: function(){
+		const gl = initWebGL("canvas-5");
+		if(gl === null) return; // WebGL not supported :(
+		
+		// shaders
+		const vectorShaderSrc = `
+attribute vec4 aVertexPosition;
+attribute vec2 aTextureCoord;
+attribute vec3 aVertexNormal;
+
+uniform mat4 uModelViewMatrix;
+uniform mat4 uProjectionMatrix;
+uniform mat4 uNormalMatrix;
+
+varying highp vec2 vTextureCoord;
+varying highp vec3 vLighting;
+
+void main(void) {
+	gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+	vTextureCoord = aTextureCoord;
+	
+	// lighting
+	highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+	highp vec3 directionalLightColor = vec3(1, 1, 1);
+	highp vec3 directionalVector = normalize(vec3(-0.5, 1, 0));
+
+	highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+
+	highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+	vLighting = ambientLight + (directionalLightColor * directional);
+}
+		`;
+		const fragmentShaderSrc = `
+uniform sampler2D uSampler;
+
+varying highp vec2 vTextureCoord;
+varying highp vec3 vLighting;
+
+void main(void) {
+	highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+	gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
+}
+		`;
+		
+		// shake-and-bake the shader code
+		const shaderProgram = initShaderProgram(gl, vectorShaderSrc, fragmentShaderSrc);
+		
+		// graphics program parameters (aka uniforms)
+		const shaderProgramData = {
+			shader: shaderProgram,
+			// uniforms and attributes defined in vector shader program
+			attribLocations: {
+				vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+				textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
+				vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
+			},
+			uniformLocations: {
+				projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+				modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+				texSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
+				normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
+			},
+		};
+		
+		// create 3D model data and store it in the graphics buffer
+		const buffers = this.initBuffers(gl);
+		
+		// draw the graphics buffers to the scene with animation
+		const renderLoop = function(time_ms){ // closure callback looping
+			test5.drawScene(gl, shaderProgramData, buffers, time_ms);
+			test5.framecounter = test5.framecounter + 1;
+			requestAnimationFrame(renderLoop);
+		}
+		requestAnimationFrame(renderLoop);
+		
+		// finally, show FPS in HTML (because text rendering in GL is ****!)
+		const fpsUpdateInterval = 250;
+		window.setInterval(function(){
+			document.querySelector('#fps-5').textContent = 1000*(test5.framecounter / fpsUpdateInterval);
+			test5.framecounter = 0;
+		}, fpsUpdateInterval);
+		
+	}
+}
+test5.main();
+		</script>
 		
 <!-- -->
 	</body>
