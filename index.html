@@ -10,14 +10,16 @@ canvas {
 	background-color: black;
 }
 		</style>
-		<script src="lib/gl-matrix-min.js" ></script>
+		<script src="lib/glmw-browser.js" ></script>
+		<!-- <script src="lib/gl-matrix-min.js" ></script> -->
 		<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"
             integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ=="
             crossorigin="anonymous"></script>-->
             <script>
-            	if(typeof mat4 === 'undefined'){
-            		mat4 = glMatrix.mat4;
-            	}
+            	var globalPromise = glmw.init().then(ready => {
+					// glmw is now ready and can be used anywhere
+					mat4 = glmw.mat4;
+				}); // I'm not 100% sold on JS promises. Hard to mix with other paradigms.
             </script>
 	</head>
 	<body>
@@ -44,7 +46,7 @@ function test1(){
 	// Clear the color buffer with specified clear color
 	gl.clear(gl.COLOR_BUFFER_BIT);
 }
-test1();
+globalPromise.then(unused => {test1()});
 		</script>
 		<!-- -->
 		
@@ -182,13 +184,17 @@ var test2 = {
 		gl.uniformMatrix4fv(
 			shaderProgramData.uniformLocations.projectionMatrix,
 			false,
-			projectionMatrix
+			//projectionMatrix
+			mat4.view(projectionMatrix) // WASM version
 		);
+		mat4.free(projectionMatrix); // WASM library does not do garbage collection
 		gl.uniformMatrix4fv(
 			shaderProgramData.uniformLocations.modelViewMatrix,
 			false,
-			modelViewMatrix
+			//modelViewMatrix
+			mat4.view(modelViewMatrix) // WASM version
 		);
+		mat4.free(modelViewMatrix); // WASM library does not do garbage collection
 		// FINALLY, draw triangles from the vertex buffer
 		const vertexCount = 4;
 		gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
@@ -252,7 +258,7 @@ var test2 = {
 		
 	}
 }
-test2.main();
+globalPromise.then(unused => {test2.main();});
 		</script>
 		
 		<!-- -->
@@ -406,13 +412,17 @@ gl.bindBuffer and gl.bufferData - enums
 			gl.uniformMatrix4fv(
 				shaderProgramData.uniformLocations.projectionMatrix,
 				false,
-				projectionMatrix
+				//projectionMatrix
+				mat4.view(projectionMatrix) // WASM version
 			);
+			mat4.free(projectionMatrix); // WASM library does not do garbage collection
 			gl.uniformMatrix4fv(
 				shaderProgramData.uniformLocations.modelViewMatrix,
 				false,
-				modelViewMatrix
+				//modelViewMatrix
+				mat4.view(modelViewMatrix) // WASM version
 			);
+			mat4.free(modelViewMatrix); // WASM library does not do garbage collection
 		}
 		// add color
 		{
@@ -507,7 +517,7 @@ void main(void) {
 		
 	}
 }
-test3.main();
+globalPromise.then(unused => {test3.main();});
 		</script>
 		
 
@@ -711,13 +721,17 @@ var test4 = {
 			gl.uniformMatrix4fv(
 				shaderProgramData.uniformLocations.projectionMatrix,
 				false,
-				projectionMatrix
+				//projectionMatrix
+				mat4.view(projectionMatrix) // WASM version
 			);
+			mat4.free(projectionMatrix); // WASM library does not do garbage collection
 			gl.uniformMatrix4fv(
 				shaderProgramData.uniformLocations.modelViewMatrix,
 				false,
-				modelViewMatrix
+				//modelViewMatrix
+				mat4.view(modelViewMatrix) // WASM version
 			);
+			mat4.free(modelViewMatrix); // WASM library does not do garbage collection
 		}
 		// texture
 		{
@@ -815,7 +829,7 @@ void main(void) {
 		
 	}
 }
-test4.main();
+globalPromise.then(unused => {test4.main();});
 		</script>
 		
 		
@@ -1022,13 +1036,17 @@ var test5 = {
 			gl.uniformMatrix4fv(
 				shaderProgramData.uniformLocations.projectionMatrix,
 				false,
-				projectionMatrix
+				//projectionMatrix
+				mat4.view(projectionMatrix) // WASM version
 			);
+			mat4.free(projectionMatrix); // WASM library does not do garbage collection
 			gl.uniformMatrix4fv(
 				shaderProgramData.uniformLocations.modelViewMatrix,
 				false,
-				modelViewMatrix
+				//modelViewMatrix
+				mat4.view(modelViewMatrix) // WASM version
 			);
+			mat4.free(modelViewMatrix); // WASM library does not do garbage collection
 		}
 		
 		// apply lighting transform
@@ -1038,8 +1056,10 @@ var test5 = {
 		gl.uniformMatrix4fv(
 			shaderProgramData.uniformLocations.normalMatrix,
 			false,
-			normalMatrix
+			//normalMatrix
+			mat4.view(normalMatrix)
 		);
+		mat4.free(normalMatrix);
 		 {
 			const numComponents = 3;
 			const type = gl.FLOAT;
@@ -1171,7 +1191,7 @@ void main(void) {
 		
 	}
 }
-test5.main();
+globalPromise.then(unused => {test5.main();});
 		</script>
 		
 <!-- -->
